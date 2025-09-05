@@ -1,6 +1,6 @@
-import argparse
 from contextlib import closing
 from datetime import date, datetime
+from gooey import Gooey, GooeyParser
 import os
 import sqlite3
 
@@ -76,30 +76,6 @@ def insert_receipt(
             )
 
 
-def validate_category(category: str, note: str):
-    if category in CATEGORY_OPTIONS:
-        return category, note
-
-    print("\nInvalid category provided!")
-    print("Please choose one of the following:")
-    for i, option in enumerate(CATEGORY_OPTIONS, start=1):
-        print(f"{i}. {option}")
-
-    choice = input(
-        "Enter number to select category, or press Enter to fallback to 'Other': "
-    ).strip()
-    if choice.isdigit() and 1 <= int(choice) <= len(CATEGORY_OPTIONS):
-        return CATEGORY_OPTIONS[int(choice) - 1], note
-    else:
-        # fallback to Other, append category to note
-        new_note = (
-            (note + f" | Original category: {category}")
-            if note
-            else f"Original category: {category}"
-        )
-        return "Other", new_note
-
-
 def parse_date_arg(date_str: str | None) -> str:
     if not date_str:
         return date.today().isoformat()
@@ -110,65 +86,90 @@ def parse_date_arg(date_str: str | None) -> str:
         raise ValueError("Invalid date format. Use YYYY-MM-DD (e.g., 2025-09-02).")
 
 
+@Gooey(program_name="Receipt Uploader")
 def parse_args():
-    parser = argparse.ArgumentParser(
-        "Receipt Uploader", description="Upload receipts into sqlite db"
+    parser = GooeyParser(description="Upload receipts into sqlite db")
+
+    receipt_group = parser.add_argument_group(
+        "Receipt Information", "All the info needed about your receipt"
     )
-    parser.add_argument(
-        "-db",
-        "--db-name",
+    receipt_group.add_argument(
+        "Store",
         type=str,
-        default="secret_finances",
-        help="Database name (default: `secret_finances`)",
+        help="Name of Organization the receipt is from",
     )
-    parser.add_argument(
-        "-tbl",
-        "--table-name",
+    receipt_group.add_argument(
+        "Category",
+        choices=CATEGORY_OPTIONS,
         type=str,
-        default="receipts",
-        help="Table name (default: `receipts`)",
+        help="Category of expense",
     )
-    parser.add_argument(
-        "--price", type=float, required=True, help="Price of the item/receipt"
+    receipt_group.add_argument(
+        "Price",
+        type=float,
+        help="Price of the item/receipt",
     )
-    parser.add_argument(
-        "--discount", type=float, default=0.0, help="Discount applied (default: `0`)"
-    )
-    parser.add_argument(
-        "--discount-percentage",
+    receipt_group.add_argument(
+        "Discount",
         type=float,
         default=0.0,
-        help="Discount percentage applied (default: `0`)",
+        help="Discount applied in dollars (default: `0`)",
     )
-    parser.add_argument("--store", type=str, required=True, help="Store name")
-    parser.add_argument(
-        "--category", type=str, required=True, help="Category of expense"
+    receipt_group.add_argument(
+        dest="discount_percentage",
+        type=float,
+        default=0.0,
+        help="Discount percentage applied in percent (default: `0`)",
     )
-    parser.add_argument("--note", type=str, default="", help="Optional note")
-    parser.add_argument(
-        "--date",
+    receipt_group.add_argument(
+        "--Note",
         type=str,
-        default=None,
-        help="Date of receipt in YYYY-MM-DD format (default: today)",
+        default="",
+        help="Optional note to help describe the receipt",
     )
+    receipt_group.add_argument(
+        "Date",
+        default=date.today().isoformat(),
+        help="Date of receipt in YYYY-MM-DD format (default: today)",
+        widget="DateChooser",
+    )
+
+    database_group = parser.add_argument_group(
+        "Database Options", "Customize where the data goes"
+    )
+    database_group.add_argument(
+        dest="db_name",
+        type=str,
+        default="secret_finances",
+        help="Name of database to store receipts in (default: `secret_finances`)",
+    )
+    database_group.add_argument(
+        dest="table_name",
+        type=str,
+        default="receipts",
+        help="Name of table to store receipts in (default: `receipts`)",
+    )
+
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    """
+    Store='urmom', Category='Eating Out (Social)', Price=1.0, Discount=0.0, Note='N/A', Date='2025-09-05',
+      **{'Discount Percentage': 0.0,  : 'receipts'}"""
 
-    category, note = validate_category(args.category, args.note)
-    receipt_date = parse_date_arg(args.date)
+    receipt_date = parse_date_arg(args.Date)
 
     insert_receipt(
         db_name=args.db_name,
         table_name=args.table_name,
-        store=args.store,
-        category=category,
-        price=args.price,
-        discount=args.discount,
+        store=args.Store,
+        category=args.Category,
+        price=args.Price,
+        discount=args.Discount,
         discount_percentage=args.discount_percentage,
-        note=note,
+        note=args.Note,
         receipt_date=receipt_date,
     )
 

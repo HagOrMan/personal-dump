@@ -1,2 +1,4 @@
 # Generated with python 3.11.3
 cryptography==44.0.0
+Gooey==1.0.8.1
+six==1.17.0
