@@ -19,7 +19,53 @@ CATEGORY_OPTIONS = [
 ]
 
 
-def ensure_table_exists(db_path: str, table_name: str):
+def ensure_disbursement_table_exists(db_path: str, table_name: str):
+    with closing(sqlite3.connect(db_path)) as connection:
+        with closing(connection.cursor()) as cursor:
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entity TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    date_received TEXT NOT NULL,
+                    reason TEXT,
+                    refunded_from_receipt INTEGER,
+                    FOREIGN KEY(refunded_from_receipt) REFERENCES receipts(id)
+                )
+                """
+            )
+            connection.commit()
+
+
+def insert_disbursement(
+    db_name: str,
+    table_name: str,
+    entity: str,
+    amount: float,
+    date_received: str,
+    reason: str,
+    refunded_from_receipt: int | None,
+):
+    db_path = os.path.join(db_folder, f"{db_name}.db")
+    ensure_disbursement_table_exists(db_path, table_name)
+
+    with closing(sqlite3.connect(db_path)) as connection:
+        with closing(connection.cursor()) as cursor:
+            cursor.execute(
+                f"""
+                INSERT INTO {table_name} (entity, amount, date_received, reason, refunded_from_receipt)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (entity, amount, date_received, reason, refunded_from_receipt),
+            )
+            connection.commit()
+            print(
+                f"Disbursement added: \n\tEntity: {entity} \n\tAmount: ${amount:.2f} \n\tDate Received: {date_received}"
+            )
+
+
+def ensure_receipts_table_exists(db_path: str, table_name: str):
     with closing(sqlite3.connect(db_path)) as connection:
         with closing(connection.cursor()) as cursor:
             cursor.execute(
@@ -51,7 +97,7 @@ def insert_receipt(
     receipt_date: str,
 ):
     db_path = os.path.join(db_folder, f"{db_name}.db")
-    ensure_table_exists(db_path, table_name)
+    ensure_receipts_table_exists(db_path, table_name)
 
     with closing(sqlite3.connect(db_path)) as connection:
         with closing(connection.cursor()) as cursor:
@@ -86,11 +132,17 @@ def parse_date_arg(date_str: str | None) -> str:
         raise ValueError("Invalid date format. Use YYYY-MM-DD (e.g., 2025-09-02).")
 
 
-@Gooey(program_name="Receipt Uploader")
+@Gooey(program_name="Receipt & Disbursement Uploader", default_tab="Receipt")
 def parse_args():
-    parser = GooeyParser(description="Upload receipts into sqlite db")
+    parser = GooeyParser(description="Upload receipts or disbursements into sqlite db")
 
-    receipt_group = parser.add_argument_group(
+    subparsers = parser.add_subparsers(help="Choose what to upload", dest="mode")
+
+    # ----------------- Receipt Tab -----------------
+    receipt_parser: GooeyParser = subparsers.add_parser(
+        "Receipt", help="Upload a receipt"
+    )
+    receipt_group = receipt_parser.add_argument_group(
         "Receipt Information", "All the info needed about your receipt"
     )
     receipt_group.add_argument(
@@ -134,20 +186,61 @@ def parse_args():
         widget="DateChooser",
     )
 
-    database_group = parser.add_argument_group(
+    database_group_receipts = receipt_parser.add_argument_group(
         "Database Options", "Customize where the data goes"
     )
-    database_group.add_argument(
+    database_group_receipts.add_argument(
         dest="db_name",
         type=str,
         default="secret_finances",
         help="Name of database to store receipts in (default: `secret_finances`)",
     )
-    database_group.add_argument(
+    database_group_receipts.add_argument(
         dest="table_name",
         type=str,
         default="receipts",
         help="Name of table to store receipts in (default: `receipts`)",
+    )
+
+    # ----------------- Disbursement Tab -----------------
+    disb_parser: GooeyParser = subparsers.add_parser(
+        "Disbursement", help="Upload a disbursement"
+    )
+    disb_group = disb_parser.add_argument_group("Disbursement Information")
+    disb_group.add_argument(
+        "Entity", type=str, help="Entity the disbursement came from"
+    )
+    disb_group.add_argument("Amount", type=float, help="Amount received in dollars")
+    disb_group.add_argument(
+        "Date_received",
+        default=date.today().isoformat(),
+        help="Date received in YYYY-MM-DD format (default: today)",
+        widget="DateChooser",
+    )
+    disb_group.add_argument(
+        "--Reason", type=str, default="", help="Optional reason for disbursement"
+    )
+    disb_group.add_argument(
+        "--Refunded_from_receipt",
+        type=int,
+        default=None,
+        help="Optional receipt ID if this disbursement is a refund",
+    )
+
+    database_group_disb = disb_parser.add_argument_group(
+        "Database Options", "Customize where the data goes"
+    )
+    database_group_disb.add_argument(
+        dest="db_name",
+        type=str,
+        default="secret_finances",
+        help="Name of database to store disbursements in (default: `secret_finances`)",
+    )
+    database_group_disb.add_argument(
+        dest="table_name",
+        type=str,
+        default="disbursements",
+        help="Name of table to store disbursements in (default: `disbursements`)",
     )
 
     return parser.parse_args()
@@ -155,23 +248,35 @@ def parse_args():
 
 def main():
     args = parse_args()
-    """
-    Store='urmom', Category='Eating Out (Social)', Price=1.0, Discount=0.0, Note='N/A', Date='2025-09-05',
-      **{'Discount Percentage': 0.0,  : 'receipts'}"""
 
-    receipt_date = parse_date_arg(args.Date)
+    if args.mode == "Receipt":
+        receipt_date = parse_date_arg(args.Date)
+        insert_receipt(
+            db_name=args.db_name,
+            table_name=args.table_name,
+            store=args.Store,
+            category=args.Category,
+            price=args.Price,
+            discount=args.Discount,
+            discount_percentage=args.discount_percentage,
+            note=args.Note,
+            receipt_date=receipt_date,
+        )
 
-    insert_receipt(
-        db_name=args.db_name,
-        table_name=args.table_name,
-        store=args.Store,
-        category=args.Category,
-        price=args.Price,
-        discount=args.Discount,
-        discount_percentage=args.discount_percentage,
-        note=args.Note,
-        receipt_date=receipt_date,
-    )
+    elif args.mode == "Disbursement":
+        disb_date = parse_date_arg(args.Date_received)
+        insert_disbursement(
+            db_name=args.db_name,
+            table_name=args.table_name,
+            entity=args.Entity,
+            amount=args.Amount,
+            date_received=disb_date,
+            reason=args.Reason,
+            refunded_from_receipt=args.Refunded_from_receipt,
+        )
+
+    else:
+        raise ValueError("Please choose either 'Receipt' or 'Disbursement' tab")
 
 
 if __name__ == "__main__":
