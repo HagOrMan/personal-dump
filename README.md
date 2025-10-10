@@ -23,6 +23,7 @@ For anyone curious enough to read this far, the secret lies in GitHub Actions an
 3. I made a fine-grained Personal Access Token (PAT) with access to this public repo and gave it `Read/Write` permissions on `Content`. ([instructions for making a fine-grained PAT](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token))
 4. I added the token as a secret to the private version of this repo, naming the token `PUBLIC_REPO_PAT`.
 5. I made a GitHub actions workflow with [a lot of testing](#trials-and-tribulations-in-my-endeavor) and ensured it not only stripped `_public` from the file name of files I wanted pushed to the public repo, but accordingly adjusted the markdown references to these files.
+6. I then wanted my commits to show up as verified when pushing to the public repo, so I added a GPG key and a step in the workflow to use it for verification when committing code. ([instructions for generating a GPG key](https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key#generating-a-gpg-key), and [instructions for adding it to your profile](https://docs.github.com/en/authentication/managing-commit-signature-verification/adding-a-gpg-key-to-your-github-account#adding-a-gpg-key))
 
 Here is the workflow I used (which I thought I would have to redact but there is no private info in it):
 ```yml
@@ -139,3 +140,5 @@ jobs:
 	- I ran into issues such as it accidentally stripping `_public` from a URL.
 4. I then tested everything in a minimal test repo, ensuring the substitutions worked well.
 5. After that, I ran the workflow in my private repo but without the step that commits to the public repo, as one final check that the modifications to the public repo looked the way I wanted them to.
+6. I realized that my code didn't actually work, because the changed files weren't being fetched from git correctly. This required changing how the private repo is checked out in the first stage of the `.yml` file, and modifying the `git diff` line to use `github.event.before`.
+7. I then realized with some more testing that subfolders didn't work, as the `_public` would be stripped from folder names as well if they existed. This required a small regex change.
