@@ -1,7 +1,8 @@
 # About
 This is the entry point for all of my personal notes. What does it tell you? That remains to be seen.
 
-If you're curious why I started this in the first place, check out [my file on why I made a digital vault](notes/WhyADigitalVault_public.md).
+If you're curious why I started this in the first place, check out [my file on why I made a digital vault](notes/WhyADigitalVault.md).
+
 # A Secret
 I never directly commit to this repo :exploding_head:
 
