@@ -38,7 +38,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout private repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # This step is used so my commits show up as verified on the public repo
+      - name: Import GPG key
+        run: |
+          mkdir -p ~/.gnupg
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "use-agent" >> ~/.gnupg/gpg.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          git config --global user.signingkey "$(gpg --list-secret-keys --keyid-format=long | grep sec | head -n1 | awk '{print $2}' | cut -d'/' -f2)"
+          git config --global commit.gpgSign true
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
       - name: Set up Git
         run: |
@@ -57,7 +71,7 @@ jobs:
       - name: Get changed _public.md files
         id: changed_public
         run: |
-          CHANGED_PUBLIC_FILES=$(git diff --name-only origin/main...HEAD | grep '_public\.md$' || true)
+          CHANGED_PUBLIC_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '_public\.md$' || true)
           echo "CHANGED_PUBLIC_FILES<<EOF" >> $GITHUB_ENV
           echo "$CHANGED_PUBLIC_FILES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -91,7 +105,7 @@ jobs:
             file="${file#./}"
 
             # Convert e.g. docs/guide_public.md → docs/guide.md
-            public_path="${file/_public/}"
+            public_path="${file%_public.*}.${file##*.}"
 
             # Full path in public repo
             public_file="public_repo/$public_path"
@@ -112,7 +126,7 @@ jobs:
         working-directory: public_repo
         run: |
           git add -A
-          git commit -m "${{ github.event.head_commit.message }}" || echo "No changes to commit"
+          git commit -S -m "${{ github.event.head_commit.message }}" || echo "No changes to commit"
           git push origin main
 ```
 
