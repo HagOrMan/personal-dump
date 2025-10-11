@@ -235,6 +235,9 @@ jobs:
           git push origin main
 ```
 
+Here is what a summary looks like in the workflow run
+![Summary of github actions workflow run](assets/README/GitHubActionsSummaryExample.png)
+
 ## Trials and Tribulations in my Endeavor
 1. To test whether the first version of pushing `_public` files worked, I made two test repos. This was just a lot of effort and setup, but worth it for the peace of mind that my precious `personal-dump` repo would not be destroyed when I started pushing to it from my private version.
 2. In doing so, it became more complicated than I thought because I needed to detect files that were deleted and ensure they got deleted in the public version of the repo.
