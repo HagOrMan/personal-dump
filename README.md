@@ -25,6 +25,7 @@ For anyone curious enough to read this far, the secret lies in GitHub Actions an
 4. I added the token as a secret to the private version of this repo, naming the token `PUBLIC_REPO_PAT`.
 5. I made a GitHub actions workflow with [a lot of testing](#trials-and-tribulations-in-my-endeavor) and ensured it not only stripped `_public` from the file name of files I wanted pushed to the public repo, but accordingly adjusted the markdown references to these files.
 6. I then wanted my commits to show up as verified when pushing to the public repo, so I added a GPG key named `GPG_PRIVATE_KEY` and a step in the workflow to use it for verification when committing code. ([instructions for generating a GPG key](https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key#generating-a-gpg-key), and [instructions for adding it to your profile](https://docs.github.com/en/authentication/managing-commit-signature-verification/adding-a-gpg-key-to-your-github-account#adding-a-gpg-key))
+7. I added a summary to the pipeline, which displays in markdown when I click on the workflow run to give a clean note on how the run went and what occured. This was simply by adding `>> $GITHUB_STEP_SUMMARY` after any echo statement, and formatting them with markdown headings, codeblocks, and lists.
 
 Here is the workflow I used (which I thought I would have to redact but there is no private info in it):
 ```yml
@@ -44,7 +45,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # This step is used so my commits show up as verified on the public repo
       - name: Import GPG key
         run: |
           mkdir -p ~/.gnupg
@@ -73,33 +73,123 @@ jobs:
       - name: Get changed _public.md files
         id: changed_public
         run: |
-          CHANGED_PUBLIC_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '_public\.md$' || true)
+          echo "# Check changed public files" >> $GITHUB_STEP_SUMMARY
+          CHANGED_PUBLIC_MARKDOWN_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- '*_public.md')
+          echo "CHANGED_PUBLIC_MARKDOWN_FILES<<EOF" >> $GITHUB_ENV
+          echo "$CHANGED_PUBLIC_MARKDOWN_FILES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          CHANGED_PUBLIC_FILES=$(git diff --name-status ${{ github.event.before }} ${{ github.sha }} -- '*_public.*')
           echo "CHANGED_PUBLIC_FILES<<EOF" >> $GITHUB_ENV
           echo "$CHANGED_PUBLIC_FILES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
+          # Log the changed files to the summary as well
+          echo "## Changed public markdown" >> $GITHUB_STEP_SUMMARY
+          echo "$CHANGED_PUBLIC_MARKDOWN_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "## Changed public (all file extensions)" >> $GITHUB_STEP_SUMMARY
+          echo "$CHANGED_PUBLIC_FILES" >> $GITHUB_STEP_SUMMARY
+
       - name: Sync public files (add, update, delete)
+        if: env.CHANGED_PUBLIC_FILES != ''
         run: |
-          # Clean everything except the .git folder so deletions are detected
-          find public_repo -mindepth 1 -not -path "public_repo/.git*" -exec rm -rf {} +
+          echo "# Syncing public files" >> $GITHUB_STEP_SUMMARY
 
           # Copy public files preserving structure
-          find . -type f -name '*_public.*' | while read file; do
-            # Remove the leading ./ from file path
-            relative_path="${file#./}"
-            
-            # Compute destination directory inside public_repo
-            dest_dir="public_repo/$(dirname "$relative_path")"
-            mkdir -p "$dest_dir"
-            
-            new_name=$(basename "$relative_path" | sed 's/_public\././')   # remove _public before the extension
-            cp "$file" "$dest_dir/$new_name"
+          echo "$CHANGED_PUBLIC_FILES" | while read status src dest; do
+            case "$status" in
+              # This is for additions or modifications
+              A|M)
+                # Remove the leading ./ from file path
+                # src is the path of the _public file
+                relative_path="${src#./}"
+
+                # Compute destination directory inside public_repo
+                dir_new="$(dirname "$relative_path")"
+                if [ "$dir_new" = "." ]; then
+                  dest_dir="public_repo"
+                else
+                  dest_dir="public_repo/$dir_new"
+                fi
+                mkdir -p "$dest_dir"
+
+                new_name=$(basename "$relative_path" | sed 's/_public\././') # remove _public before the extension
+                cp "$src" "$dest_dir/$new_name"
+                echo "- added/modified file \`$dest_dir/$new_name\`" >> $GITHUB_STEP_SUMMARY
+                ;;
+
+              # This is for deletions
+              D)
+                # Remove the leading ./ from file path
+                # src is the previous _public file path
+                relative_path="${src#./}"
+
+                # Compute destination directory inside public_repo
+                dir_old="$(dirname "$relative_path")"
+                if [ "$dir_old" = "." ]; then
+                  dest_dir="public_repo"
+                else
+                  dest_dir="public_repo/$dir_old"
+                fi
+                old_name=$(basename "$relative_path" | sed 's/_public\././') # remove _public before the extension
+
+                # Delete if it exists
+                if [ -f "$dest_dir/$old_name" ]; then
+                  rm "$dest_dir/$old_name"
+                  echo "- deleted from \`$dest_dir/$old_name\`" >> $GITHUB_STEP_SUMMARY
+                else
+                  echo "- ⚠️ could not delete \`$dest_dir/$old_name\` (not found)" >> $GITHUB_STEP_SUMMARY
+                fi
+                
+                ;;
+
+              # This is for renames
+              R*)
+                # Remove the leading ./ from file path
+                # For renames, both src (old) and dest (new) are provided
+                old_relative="${src#./}"
+                new_relative="${dest#./}"
+
+                # Compute destination directory inside public_repo
+                dir_old="$(dirname "$old_relative")"
+                if [ "$dir_old" = "." ]; then
+                  old_dir="public_repo"
+                else
+                  old_dir="public_repo/$dir_old"
+                fi
+
+                dir_new="$(dirname "$new_relative")"
+                if [ "$dir_new" = "." ]; then
+                  new_dir="public_repo"
+                else
+                  new_dir="public_repo/$dir_new"
+                fi
+
+                # remove _public before the extension
+                old_name=$(basename "$old_relative" | sed 's/_public\././')
+                new_name=$(basename "$new_relative" | sed 's/_public\././')
+
+                # Ensure destination exists
+                mkdir -p "$new_dir"
+
+                # If old file exists, rename it; otherwise just copy the new one
+                if [ -f "$old_dir/$old_name" ]; then
+                  mv "$old_dir/$old_name" "$new_dir/$new_name"
+                  echo "- renamed \`$old_dir/$old_name\` to \`$new_dir/$new_name\`" >> $GITHUB_STEP_SUMMARY
+                else
+                  cp "$dest" "$new_dir/$new_name"
+                  echo "- copied \`$dest\` to \`$new_dir/$new_name\`, could not find the old file" >> $GITHUB_STEP_SUMMARY
+                fi
+                ;;
+            esac
           done
 
       - name: Fix markdown references only in changed files
-        if: env.CHANGED_PUBLIC_FILES != ''
+        if: env.CHANGED_PUBLIC_MARKDOWN_FILES != ''
         run: |
-          echo "$CHANGED_PUBLIC_FILES" | while read file; do
+          echo >> $GITHUB_STEP_SUMMARY
+          echo "# Beginning to fix markdown references in files" >> $GITHUB_STEP_SUMMARY
+          echo "$CHANGED_PUBLIC_MARKDOWN_FILES" | while read file; do
             # Skip empty lines
             [ -z "$file" ] && continue
 
@@ -113,14 +203,14 @@ jobs:
             public_file="public_repo/$public_path"
 
             if [ -f "$public_file" ]; then
-              echo "Fixing markdown references in: $public_file"
+              echo "- \`$public_file\`" >> $GITHUB_STEP_SUMMARY
 
               # Inline links/images
               sed -i -E 's@(\]\([^)]*?)_public(\.[^)/?#]+)([?#][^)]*)?@\1\2\3@g' "$public_file"
               # Reference-style links
               sed -i -E 's@(\[[^]]*\]:[[:space:]]*)([^:)]*)_public(\.[^)/?#]+)([?#][^)]*)?@\1\2\3\4@g' "$public_file"
             else
-              echo "Skipping $public_file (not found)"
+              echo "- ⚠️ Skipping \`$public_file\` (not found)" >> $GITHUB_STEP_SUMMARY
             fi
           done
 
@@ -128,7 +218,20 @@ jobs:
         working-directory: public_repo
         run: |
           git add -A
-          git commit -S -m "${{ github.event.head_commit.message }}" || echo "No changes to commit"
+
+          echo "# Check repo before commit" >> $GITHUB_STEP_SUMMARY
+          echo '🔍 Final repo status:' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          git status >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo >> $GITHUB_STEP_SUMMARY
+          echo '🔍 Pending changes:' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          git diff --cached >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          git commit -S -m "${{ github.event.head_commit.message }}" || { echo "**No changes to commit**" >> $GITHUB_STEP_SUMMARY; }
           git push origin main
 ```
 
@@ -143,3 +246,7 @@ jobs:
 5. After that, I ran the workflow in my private repo but without the step that commits to the public repo, as one final check that the modifications to the public repo looked the way I wanted them to.
 6. I realized that my code didn't actually work, because the changed files weren't being fetched from git correctly. This required changing how the private repo is checked out in the first stage of the `.yml` file, and modifying the `git diff` line to use `github.event.before`.
 7. I then realized with some more testing that subfolders didn't work, as the `_public` would be stripped from folder names as well if they existed. This required a small regex change.
+8. I found that files which were markdown but not modified in the latest commit would have their processing undone, so I had to make a "smarter" version of the script which only touched modified files.
+   - This was fun because I also explored GitHub Actions Summary in doing so for testing, and the output of the automated workflows has never looked nicer.
+   - It took effort and testing to make sure the file paths looked good, the correct files were modified, and then that the logging worked properly.
+   - I tested every case of addition, modification, deletion, and rename, and dealt with a file path with an extra `./`, plus my logs not displaying anything because I didn't escape the \` which surrounded the file name (I logged something like "added file `file.txt`").
