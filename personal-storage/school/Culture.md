@@ -7,6 +7,8 @@ Anything related to school culture that I deem necessary or important to save
 - [Mac Eng Musical](#mac-eng-musical)
 
 # Mac Eng Musical
+All of the YouTube videos are linked here: https://www.macengmusical.com/old-shows
+
 The very first Mac Eng Musical, Jopko and the Amazing Technicolour Vectorspace (1999): https://www.youtube.com/watch?v=p_Yy37htmH4
 
 Hamleng (2023): https://www.youtube.com/watch?v=4FPxWDMJ1Z8
