@@ -5,7 +5,13 @@ Any useful links in my personal life which unfortunately can intersect with work
 - [About](#about)
 - [Table of Contents](#table-of-contents)
 - [Photo Editing](#photo-editing)
+- [PDFs](#pdfs)
+  - [PDF Combiner](#pdf-combiner)
 
 
 # Photo Editing
 Free photo editor!!! https://www.photopea.com/
+
+# PDFs
+## PDF Combiner
+Free, provided by adobe: https://www.adobe.com/ca/acrobat/online/merge-pdf.html
