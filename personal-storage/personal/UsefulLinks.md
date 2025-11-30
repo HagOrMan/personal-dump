@@ -14,4 +14,5 @@ Free photo editor!!! https://www.photopea.com/
 
 # PDFs
 ## PDF Combiner
-Free, provided by adobe: https://www.adobe.com/ca/acrobat/online/merge-pdf.html
+- Free, maintains internal references in files: https://www.sejda.com/merge-pdf
+- Free, provided by adobe (but does not maintain internal references): https://www.adobe.com/ca/acrobat/online/merge-pdf.html
