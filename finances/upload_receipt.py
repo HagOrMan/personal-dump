@@ -16,6 +16,7 @@ CATEGORY_OPTIONS = [
     "Rent",
     "School",
     "Transportation",
+    "Gift",
     "Other",
 ]
 
