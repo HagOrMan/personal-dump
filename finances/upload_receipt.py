@@ -17,6 +17,8 @@ CATEGORY_OPTIONS = [
     "School",
     "Transportation",
     "Gift",
+    "Professional Development (including events)",  # This can include anything from a conference that I go to and associated costs to a lecture I attend and the transportation costs involved.
+    "Travel",  # This is costs associated with travelling for fun
     "Other",
 ]
 

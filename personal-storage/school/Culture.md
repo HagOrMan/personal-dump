@@ -13,3 +13,5 @@ The very first Mac Eng Musical, Jopko and the Amazing Technicolour Vectorspace (
 
 Hamleng (2023): https://www.youtube.com/watch?v=4FPxWDMJ1Z8
 
+The Odyssey (2025): https://www.youtube.com/watch?v=6QRuzMkfb5o&list=PLblR3ZocPfy1mxeDCImpSk7R6nJdJOdnG&index=2
+
