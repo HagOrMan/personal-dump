@@ -72,3 +72,7 @@ An animation engine for explanatory math videos using programs: https://github.c
 # Markdown Help
 ## Github Emojis
 List of github shortcuts for all emojis it supports in markdown: https://github.com/ikatyang/emoji-cheat-sheet
+
+# Learning
+## Free Courses
+Online CS courses, all free: https://csdiy.wiki/en/%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0%E7%B3%BB%E7%BB%9F/AICS/#course-overview

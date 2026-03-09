@@ -121,8 +121,12 @@ def insert_receipt(
                 ),
             )
             connection.commit()
+
+            # Retrieve ID of added receipt
+            receipt_id = cursor.lastrowid
+
             print(
-                f"Receipt added: \n\tStore: {store} \n\tCategory: {category} \n\tPrice: ${price:.2f}"
+                f"Receipt added: \n\tID: {receipt_id} \n\tStore: {store} \n\tCategory: {category} \n\tPrice: ${price:.2f}"
             )
 
 
